@@ -22,9 +22,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Глобальные переменные и состояния разговора
+# Определение состояний разговора:
+# MENU - главное меню,
+# RUSSIAN - работа с русским языком,
+# ENGLISH_SET_TIME - установка времени для английских слов,
+# PRACTICE_MENU - меню практических задач по математике,
+# DISCRIMINANT - состояние ожидания ввода для дискриминанта,
+# ARITHMETIC - состояние ожидания ввода для арифметической прогрессии,
+# GEOMETRIC - состояние ожидания ввода для геометрической прогрессии,
+# THEORY_MENU - меню теоретической части математики.
+MENU, RUSSIAN, ENGLISH_SET_TIME, PRACTICE_MENU, DISCRIMINANT, ARITHMETIC, GEOMETRIC, THEORY_MENU = range(8)
+
 russian_dictionary = None
-MENU, RUSSIAN, ENGLISH_SET_TIME = range(3)
 
 def get_file_path(filename):
     """
@@ -98,17 +107,31 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ENGLISH_SET_TIME
     elif data == "math":
         await math_handler(update, context)
+        return MENU
+    elif data == "math_theory":
+        await theory_menu_handler(update, context)
+        return THEORY_MENU
+    elif data == "math_practice":
+        await practice_menu_handler(update, context)
+        return PRACTICE_MENU
+    elif data == "back_math":
+        await math_handler(update, context)
+        return MENU
+    elif data == "disc":
+        await discriminant_prompt(update, context)
+        return DISCRIMINANT
+    elif data == "arith":
+        await arithmetic_progression_prompt(update, context)
+        return ARITHMETIC
+    elif data == "geom":
+        await geometric_progression_prompt(update, context)
+        return GEOMETRIC
     elif data == "algebra":
         await algebra_handler(update, context)
     elif data == "geometry":
         await geometry_handler(update, context)
     elif data.startswith(("algebra_", "geometry_")):
         await send_math_file(update, context)
-    elif data == "menu":
-        await query.edit_message_text(
-            text="Возврат в главное меню.", reply_markup=main_menu_keyboard()
-        )
-        return MENU
     else:
         await query.edit_message_text(text="Неверный выбор. Попробуйте снова.")
     return MENU
@@ -230,16 +253,45 @@ async def send_english_words(context: ContextTypes.DEFAULT_TYPE):
 
 async def math_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Обрабатывает выбор раздела математики и предлагает выбрать между алгеброй и геометрией.
+    Предлагает выбрать между теорией и практикой в разделе математики.
+    """
+    query = update.callback_query
+    keyboard = [
+        [InlineKeyboardButton("Теория", callback_data="math_theory")],
+        [InlineKeyboardButton("Практика", callback_data="math_practice")],
+        [InlineKeyboardButton("Назад в главное меню", callback_data="menu")]
+    ]
+    await query.edit_message_text(
+        text="Выберите раздел математики:", reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def theory_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Показывает меню теоретической части математики с выбором разделов.
     """
     query = update.callback_query
     keyboard = [
         [InlineKeyboardButton("Алгебра", callback_data="algebra")],
         [InlineKeyboardButton("Геометрия", callback_data="geometry")],
-        [InlineKeyboardButton("Назад в главное меню", callback_data="menu")]
+        [InlineKeyboardButton("Назад к разделу математики", callback_data="math")]
     ]
     await query.edit_message_text(
-        text="Выберите раздел математики:", reply_markup=InlineKeyboardMarkup(keyboard)
+        text="Выберите раздел теории математики:", reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def practice_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Показывает меню практических задач по математике.
+    """
+    query = update.callback_query
+    keyboard = [
+        [InlineKeyboardButton("Вычисление дискриминанта", callback_data="disc")],
+        [InlineKeyboardButton("Арифметическая прогрессия", callback_data="arith")],
+        [InlineKeyboardButton("Геометрическая прогрессия", callback_data="geom")],
+        [InlineKeyboardButton("Назад к разделу математики", callback_data="math")]
+    ]
+    await query.edit_message_text(
+        text="Выберите практическую задачу по математике:", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def algebra_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -252,7 +304,7 @@ async def algebra_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i in range(5, 10)
     ]
     keyboard.append(
-        [InlineKeyboardButton("Назад к разделу математики", callback_data="math")]
+        [InlineKeyboardButton("Назад к разделу теории", callback_data="math")]
     )
     await query.edit_message_text(
         text="Выберите класс для получения материалов по алгебре:",
@@ -269,7 +321,7 @@ async def geometry_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for i in range(7, 10)
     ]
     keyboard.append(
-        [InlineKeyboardButton("Назад к разделу математики", callback_data="math")]
+        [InlineKeyboardButton("Назад к разделу теории", callback_data="math")]
     )
     await query.edit_message_text(
         text="Выберите класс для получения материалов по геометрии:",
@@ -311,11 +363,149 @@ async def send_math_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Возвращаемся в главное меню.", reply_markup=main_menu_keyboard()
     )
 
+# Функции для практических задач
+
+async def discriminant_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Запрашивает у пользователя коэффициенты a, b, c для вычисления дискриминанта.
+    """
+    query = update.callback_query
+    await query.edit_message_text(
+        "Введите коэффициенты a, b, c через пробел (например: 1 5 6):\n"
+        "Формула: D = b² - 4ac"
+    )
+    return DISCRIMINANT
+
+async def calculate_discriminant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Вычисляет дискриминант и подробно объясняет шаги вычисления.
+    """
+    text = update.message.text.strip()
+    try:
+        parts = text.split()
+        if len(parts) != 3:
+            await update.message.reply_text("Пожалуйста, введите ровно три числа, разделенные пробелами.")
+            return DISCRIMINANT
+        a, b, c = map(float, parts)
+        D = b**2 - 4 * a * c
+        explanation = (
+            f"Для вычисления дискриминанта по формуле D = b² - 4ac:\n"
+            f"Подставляем значения: a = {a}, b = {b}, c = {c}\n"
+            f"Вычисляем b²: {b}² = {b**2}\n"
+            f"Вычисляем 4ac: 4 * {a} * {c} = {4 * a * c}\n"
+            f"Таким образом, D = {b**2} - {4 * a * c} = {D}\n"
+        )
+        if D > 0:
+            explanation += "Дискриминант положительный. Уравнение имеет два различных вещественных корня."
+        elif D == 0:
+            explanation += "Дискриминант равен нулю. Уравнение имеет один корень (два совпадающих)."
+        else:
+            explanation += "Дискриминант отрицательный. Уравнение не имеет вещественных корней."
+        await update.message.reply_text(explanation)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}. Проверьте правильность ввода.")
+        return DISCRIMINANT
+
+    await update.message.reply_text("Возвращаемся в главное меню.", reply_markup=main_menu_keyboard())
+    return MENU
+
+async def arithmetic_progression_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Запрашивает у пользователя данные для вычисления арифметической прогрессии.
+    """
+    query = update.callback_query
+    await query.edit_message_text(
+        "Введите через пробел три числа:\n"
+        "1. Первый член прогрессии (a₁)\n"
+        "2. Разность прогрессии (d)\n"
+        "3. Количество членов (n)\n"
+        "Например: 2 3 5"
+    )
+    return ARITHMETIC
+
+async def calculate_arithmetic(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Вычисляет арифметическую прогрессию, выводит последовательность и сумму, с подробным объяснением.
+    """
+    text = update.message.text.strip()
+    try:
+        parts = text.split()
+        if len(parts) != 3:
+            await update.message.reply_text("Пожалуйста, введите ровно три числа, разделенные пробелами.")
+            return ARITHMETIC
+        a1, d, n = parts
+        a1 = float(a1)
+        d = float(d)
+        n = int(n)
+        terms = [a1 + i * d for i in range(n)]
+        progression_str = ", ".join(str(term) for term in terms)
+        sum_progression = n / 2 * (2 * a1 + (n - 1) * d)
+        explanation = (
+            f"Для арифметической прогрессии с первым членом {a1}, разностью {d} и количеством членов {n}:\n"
+            f"Последовательность: {progression_str}\n"
+            f"Сумма членов (по формуле S = n/2 * (2a₁ + (n-1)d)) = {sum_progression}"
+        )
+        await update.message.reply_text(explanation)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}. Проверьте правильность ввода.")
+        return ARITHMETIC
+
+    await update.message.reply_text("Возвращаемся в главное меню.", reply_markup=main_menu_keyboard())
+    return MENU
+
+async def geometric_progression_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Запрашивает у пользователя данные для вычисления геометрической прогрессии.
+    """
+    query = update.callback_query
+    await query.edit_message_text(
+        "Введите через пробел три числа:\n"
+        "1. Первый член прогрессии (a₁)\n"
+        "2. Знаменатель прогрессии (r)\n"
+        "3. Количество членов (n)\n"
+        "Например: 2 3 5"
+    )
+    return GEOMETRIC
+
+async def calculate_geometric(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Вычисляет геометрическую прогрессию, выводит последовательность и сумму (если знаменатель не равен 1),
+    с подробным объяснением.
+    """
+    text = update.message.text.strip()
+    try:
+        parts = text.split()
+        if len(parts) != 3:
+            await update.message.reply_text("Пожалуйста, введите ровно три числа, разделенные пробелами.")
+            return GEOMETRIC
+        a1, r, n = parts
+        a1 = float(a1)
+        r = float(r)
+        n = int(n)
+        terms = [a1 * (r ** i) for i in range(n)]
+        progression_str = ", ".join(str(term) for term in terms)
+        explanation = (
+            f"Для геометрической прогрессии с первым членом {a1}, знаменателем {r} и количеством членов {n}:\n"
+            f"Последовательность: {progression_str}\n"
+        )
+        if r != 1:
+            sum_progression = a1 * (r ** n - 1) / (r - 1)
+            explanation += f"Сумма членов (по формуле S = a₁*(rⁿ - 1)/(r - 1)) = {sum_progression}"
+        else:
+            explanation += f"Так как знаменатель равен 1, сумма равна {a1 * n} (просто сумма повторяющихся членов)."
+        await update.message.reply_text(explanation)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}. Проверьте правильность ввода.")
+        return GEOMETRIC
+
+    await update.message.reply_text("Возвращаемся в главное меню.", reply_markup=main_menu_keyboard())
+    return MENU
+
 def main():
     """
     Основная функция для запуска бота.
     """
-    TOKEN = "Your token"  # Замените на реальный токен
+    TOKEN = "Your Token"  # Замените на реальный токен
     app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
@@ -323,7 +513,12 @@ def main():
         states={
             MENU: [CallbackQueryHandler(button_handler)],
             RUSSIAN: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_russian_word)],
-            ENGLISH_SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_english_time)]
+            ENGLISH_SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_english_time)],
+            PRACTICE_MENU: [CallbackQueryHandler(button_handler)],
+            THEORY_MENU: [CallbackQueryHandler(button_handler)],
+            DISCRIMINANT: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_discriminant)],
+            ARITHMETIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_arithmetic)],
+            GEOMETRIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_geometric)],
         },
         fallbacks=[CommandHandler("start", start)]
     )
