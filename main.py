@@ -1,9 +1,6 @@
-
-
 import os
 import datetime
 import random
-import difflib
 import logging
 import math
 
@@ -68,11 +65,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "russian":
-        await query.edit_message_text("Введите слово:")
+        # Показываем кнопку «Назад» в разделе Русский
+        await query.edit_message_text(
+            "Введите слово:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("Назад", callback_data="menu")]
+            ])
+        )
         return RUSSIAN
+
     elif data == "english":
         await query.edit_message_text("Введите время (ЧЧ:ММ):")
         return ENGLISH_SET_TIME
+
     elif data == "math":
         keyboard = [
             [InlineKeyboardButton("Теория", callback_data="math_theory")],
@@ -81,6 +86,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("Раздел математики:", reply_markup=InlineKeyboardMarkup(keyboard))
         return MENU
+
     elif data == "math_theory":
         keyboard = [
             [InlineKeyboardButton("Алгебра", callback_data="algebra")],
@@ -89,6 +95,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("Выберите тему:", reply_markup=InlineKeyboardMarkup(keyboard))
         return MENU
+
     elif data == "math_practice":
         keyboard = [
             [InlineKeyboardButton("Вычисление дискриминанта", callback_data="disc")],
@@ -99,21 +106,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         await query.edit_message_text("Практика по математике:", reply_markup=InlineKeyboardMarkup(keyboard))
         return PRACTICE_MENU
+
     elif data == "disc":
         await query.edit_message_text(
             "Введите коэффициенты a, b, c через пробел (например: 1 5 6):\nФормула: D = b² - 4ac"
         )
         return DISCRIMINANT
+
     elif data == "arith":
         await query.edit_message_text(
             "Введите через пробел: первый член (a₁), разность (d) и количество членов (n).\nНапример: 2 3 5"
         )
         return ARITHMETIC
+
     elif data == "geom":
         await query.edit_message_text(
             "Введите через пробел: первый член (a₁), знаменатель (r) и количество членов (n).\nНапример: 2 3 5"
         )
         return GEOMETRIC
+
     elif data == "pythagoras":
         keyboard = [
             [InlineKeyboardButton("Найти гипотенузу", callback_data="find_hypotenuse")],
@@ -124,20 +135,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Что найти по теореме Пифагора?", reply_markup=InlineKeyboardMarkup(keyboard)
         )
         return PYTHAGORAS
+
     elif data == "find_hypotenuse":
         context.user_data["pythagoras_mode"] = "hypotenuse"
         await query.edit_message_text("Введите два катета через пробел (например: 3 4):")
         return PYTHAGORAS
+
     elif data == "find_leg":
         context.user_data["pythagoras_mode"] = "leg"
         await query.edit_message_text("Введите гипотенузу и известный катет через пробел (например: 5 3):")
         return PYTHAGORAS
+
     elif data.startswith(("algebra_", "geometry_")):
         await send_math_file(update, context)
         return MENU
+
     elif data == "menu":
         await query.edit_message_text("Возврат в главное меню.", reply_markup=main_menu_keyboard())
         return MENU
+
     else:
         await query.edit_message_text("Неверный выбор. Попробуйте снова.")
         return MENU
@@ -152,6 +168,7 @@ async def process_russian_word(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(definition)
     else:
         await update.message.reply_text("Слово не найдено.")
+    # После обработки возвращаемся в главное меню
     await update.message.reply_text("Выберите предмет:", reply_markup=main_menu_keyboard())
     return MENU
 
@@ -166,7 +183,7 @@ async def set_english_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
         delay = (target_dt - now).total_seconds()
         context.application.job_queue.run_once(send_english_words, delay, chat_id=update.effective_chat.id)
         await update.message.reply_text("Английские слова будут отправлены позже.")
-    except Exception as e:
+    except Exception:
         await update.message.reply_text("Неверный формат времени. Используйте ЧЧ:ММ.")
         return ENGLISH_SET_TIME
     return MENU
@@ -178,7 +195,7 @@ async def send_english_words(context: ContextTypes.DEFAULT_TYPE):
             lines = f.readlines()
         words = random.sample(lines, min(5, len(lines)))
         await context.bot.send_message(context.job.chat_id, text="Английские слова:\n" + "".join(words))
-    except Exception as e:
+    except Exception:
         await context.bot.send_message(context.job.chat_id, text="Ошибка загрузки файла words.txt.")
 
 async def send_math_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -206,7 +223,7 @@ async def calculate_discriminant(update: Update, context: ContextTypes.DEFAULT_T
         else:
             response += "\nДискриминант отрицательный: вещественных корней нет."
         await update.message.reply_text(response)
-    except Exception as e:
+    except Exception:
         await update.message.reply_text("Ошибка: введите 3 числа через пробел.")
         return DISCRIMINANT
     return await back_to_menu(update)
@@ -224,7 +241,7 @@ async def calculate_arithmetic(update: Update, context: ContextTypes.DEFAULT_TYP
             f"Сумма: {S}"
         )
         await update.message.reply_text(response)
-    except Exception as e:
+    except Exception:
         await update.message.reply_text("Ошибка: введите 3 числа (a₁, d, n) через пробел.")
         return ARITHMETIC
     return await back_to_menu(update)
@@ -245,7 +262,7 @@ async def calculate_geometric(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"Сумма: {S}"
         )
         await update.message.reply_text(response)
-    except Exception as e:
+    except Exception:
         await update.message.reply_text("Ошибка: введите 3 числа (a₁, r, n) через пробел.")
         return GEOMETRIC
     return await back_to_menu(update)
@@ -287,18 +304,22 @@ async def back_to_menu(update: Update):
     return MENU
 
 def main():
-    app = ApplicationBuilder().token("token").build()
+    app = ApplicationBuilder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             MENU: [CallbackQueryHandler(button_handler)],
-            RUSSIAN: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_russian_word)],
+            RUSSIAN: [
+                # 1) Пользователь вводит слово
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_russian_word),
+                # 2) Пользователь может нажать «Назад» (callback_data="menu")
+                CallbackQueryHandler(button_handler)
+            ],
             ENGLISH_SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_english_time)],
             PRACTICE_MENU: [CallbackQueryHandler(button_handler)],
             DISCRIMINANT: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_discriminant)],
             ARITHMETIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_arithmetic)],
             GEOMETRIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_geometric)],
-            # Теперь в состоянии PYTHAGORAS обрабатываем как кнопки, так и текст:
             PYTHAGORAS: [
                 CallbackQueryHandler(button_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_pythagoras)
