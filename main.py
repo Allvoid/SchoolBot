@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Определение состояний:
 # MENU (0), RUSSIAN (1), ENGLISH_SET_TIME (2), PRACTICE_MENU (3),
-# DISCRIMINANT (4), ARITHMETIC (5), GEOMETRIC (6), PYTHAGORAS (7)
-MENU, RUSSIAN, ENGLISH_SET_TIME, PRACTICE_MENU, DISCRIMINANT, ARITHMETIC, GEOMETRIC, PYTHAGORAS = range(8)
+# DISCRIMINANT (4), ARITHMETIC (5), GEOMETRIC (6), PYTHAGORAS (7), HERON (8)
+MENU, RUSSIAN, ENGLISH_SET_TIME, PRACTICE_MENU, DISCRIMINANT, ARITHMETIC, GEOMETRIC, PYTHAGORAS, HERON = range(9)
 russian_dictionary = None
 
 def get_file_path(filename):
@@ -102,6 +102,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Арифметическая прогрессия", callback_data="arith")],
             [InlineKeyboardButton("Геометрическая прогрессия", callback_data="geom")],
             [InlineKeyboardButton("Теорема Пифагора", callback_data="pythagoras")],
+            [InlineKeyboardButton("Теорема Герона", callback_data="heron")],
             [InlineKeyboardButton("Назад", callback_data="math")]
         ]
         await query.edit_message_text("Практика по математике:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -145,6 +146,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["pythagoras_mode"] = "leg"
         await query.edit_message_text("Введите гипотенузу и известный катет через пробел (например: 5 3):")
         return PYTHAGORAS
+
+    elif data == "heron":
+        await query.edit_message_text(
+            "Введите через пробел длины трёх сторон треугольника (например: 3 4 5):"
+        )
+        return HERON
 
     elif data.startswith(("algebra_", "geometry_")):
         await send_math_file(update, context)
@@ -299,6 +306,29 @@ async def calculate_pythagoras(update: Update, context: ContextTypes.DEFAULT_TYP
         return PYTHAGORAS
     return await back_to_menu(update)
 
+async def calculate_heron(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        a, b, c = map(float, update.message.text.strip().split())
+        # Проверка на существование треугольника
+        if a + b <= c or a + c <= b or b + c <= a:
+            await update.message.reply_text("Ошибка: эти числа не могут быть сторонами одного треугольника.")
+            return HERON
+        s = (a + b + c) / 2
+        area = math.sqrt(s * (s - a) * (s - b) * (s - c))
+        explanation = (
+            f"Вычисляем полупериметр:\n"
+            f"s = (a + b + c) / 2 = ({a} + {b} + {c}) / 2 = {s}\n"
+            f"Площадь по формуле Герона:\n"
+            f"S = √(s * (s - a) * (s - b) * (s - c))\n"
+            f"  = √({s} * ({s} - {a}) * ({s} - {b}) * ({s} - {c}))\n"
+            f"  = {area}"
+        )
+        await update.message.reply_text(explanation)
+    except Exception:
+        await update.message.reply_text("Ошибка: введите 3 числа через пробел.")
+        return HERON
+    return await back_to_menu(update)
+
 async def back_to_menu(update: Update):
     await update.message.reply_text("Возвращаемся в главное меню.", reply_markup=main_menu_keyboard())
     return MENU
@@ -324,6 +354,7 @@ def main():
                 CallbackQueryHandler(button_handler),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_pythagoras)
             ],
+            HERON: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_heron)],
         },
         fallbacks=[CommandHandler("start", start)]
     )
