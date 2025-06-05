@@ -24,8 +24,9 @@ logger = logging.getLogger(__name__)
 
 # Определение состояний:
 # MENU (0), RUSSIAN (1), ENGLISH_SET_TIME (2), PRACTICE_MENU (3),
-# DISCRIMINANT (4), ARITHMETIC (5), GEOMETRIC (6), PYTHAGORAS (7), HERON (8)
-MENU, RUSSIAN, ENGLISH_SET_TIME, PRACTICE_MENU, DISCRIMINANT, ARITHMETIC, GEOMETRIC, PYTHAGORAS, HERON = range(9)
+# DISCRIMINANT (4), ARITHMETIC (5), GEOMETRIC (6), PYTHAGORAS (7),
+# HERON (8), COSINE (9)
+MENU, RUSSIAN, ENGLISH_SET_TIME, PRACTICE_MENU, DISCRIMINANT, ARITHMETIC, GEOMETRIC, PYTHAGORAS, HERON, COSINE = range(10)
 russian_dictionary = None
 
 def get_file_path(filename):
@@ -65,7 +66,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
 
     if data == "russian":
-        # Показываем кнопку «Назад» в разделе Русский
         await query.edit_message_text(
             "Введите слово:",
             reply_markup=InlineKeyboardMarkup([
@@ -103,6 +103,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("Геометрическая прогрессия", callback_data="geom")],
             [InlineKeyboardButton("Теорема Пифагора", callback_data="pythagoras")],
             [InlineKeyboardButton("Теорема Герона", callback_data="heron")],
+            [InlineKeyboardButton("Теорема Косинусов", callback_data="cosine")],
             [InlineKeyboardButton("Назад", callback_data="math")]
         ]
         await query.edit_message_text("Практика по математике:", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -153,6 +154,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return HERON
 
+    elif data == "cosine":
+        await query.edit_message_text(
+            "Введите через пробел: a, b и угол C в градусах (например: 3 4 60):\nФормула: c² = a² + b² - 2ab·cos(C)"
+        )
+        return COSINE
+
     elif data.startswith(("algebra_", "geometry_")):
         await send_math_file(update, context)
         return MENU
@@ -175,7 +182,6 @@ async def process_russian_word(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(definition)
     else:
         await update.message.reply_text("Слово не найдено.")
-    # После обработки возвращаемся в главное меню
     await update.message.reply_text("Выберите предмет:", reply_markup=main_menu_keyboard())
     return MENU
 
@@ -309,7 +315,6 @@ async def calculate_pythagoras(update: Update, context: ContextTypes.DEFAULT_TYP
 async def calculate_heron(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         a, b, c = map(float, update.message.text.strip().split())
-        # Проверка на существование треугольника
         if a + b <= c or a + c <= b or b + c <= a:
             await update.message.reply_text("Ошибка: эти числа не могут быть сторонами одного треугольника.")
             return HERON
@@ -329,6 +334,29 @@ async def calculate_heron(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return HERON
     return await back_to_menu(update)
 
+async def calculate_cosine(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        a, b, angle_deg = map(float, update.message.text.strip().split())
+        # Конвертируем угол в радианы
+        angle_rad = math.radians(angle_deg)
+        c_squared = a**2 + b**2 - 2 * a * b * math.cos(angle_rad)
+        if c_squared < 0:
+            raise ValueError("Получилось отрицательное значение под корнем.")
+        c = math.sqrt(c_squared)
+        explanation = (
+            f"Вычисляем по теореме косинусов:\n"
+            f"c² = a² + b² - 2ab·cos(C)\n"
+            f"   = {a}² + {b}² - 2·{a}·{b}·cos({angle_deg}°)\n"
+            f"   = {a**2} + {b**2} - 2·{a}·{b}·{math.cos(angle_rad)}\n"
+            f"   = {c_squared}\n"
+            f"c = √{c_squared} = {c}"
+        )
+        await update.message.reply_text(explanation)
+    except Exception as e:
+        await update.message.reply_text(f"Ошибка: {e}. Введите корректные числа и угол.")
+        return COSINE
+    return await back_to_menu(update)
+
 async def back_to_menu(update: Update):
     await update.message.reply_text("Возвращаемся в главное меню.", reply_markup=main_menu_keyboard())
     return MENU
@@ -340,9 +368,7 @@ def main():
         states={
             MENU: [CallbackQueryHandler(button_handler)],
             RUSSIAN: [
-                # 1) Пользователь вводит слово
                 MessageHandler(filters.TEXT & ~filters.COMMAND, process_russian_word),
-                # 2) Пользователь может нажать «Назад» (callback_data="menu")
                 CallbackQueryHandler(button_handler)
             ],
             ENGLISH_SET_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, set_english_time)],
@@ -355,6 +381,7 @@ def main():
                 MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_pythagoras)
             ],
             HERON: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_heron)],
+            COSINE: [MessageHandler(filters.TEXT & ~filters.COMMAND, calculate_cosine)],
         },
         fallbacks=[CommandHandler("start", start)]
     )
